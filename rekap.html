@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rekap Transaksi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader {
+            border: 2px solid #fff; border-top: 2px solid transparent; border-radius: 50%; width: 14px; height: 14px; animation: spin 0.6s linear infinite; display: inline-block; vertical-align: middle;
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        /* Modal Style */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 24px; border-radius: 8px; width: 90%; max-width: 400px; }
+        /* Mobile Table Optimization */
+        @media (max-width: 640px) { 
+            #headerTable thead, #detailTable thead { display: none; } 
+            #headerTable tr, #detailTable tr { display: block; margin-bottom: 12px; border: 1px solid #e5e7eb; padding: 10px; border-radius: 8px; } 
+            #headerTable td, #detailTable td { display: flex; justify-content: space-between; padding: 6px 0; border: none; } 
+            #headerTable td::before, #detailTable td::before { content: attr(data-label); font-weight: 600; color: #374151; margin-right: 8px; }
+            /* Penyesuaian untuk footer Grand Total di mobile */
+            #detailFooter td:nth-child(1) { justify-content: flex-end; } 
+            #detailFooter td:nth-child(2) { justify-content: flex-end; }
+            #detailFooter td:nth-child(3) { justify-content: space-between; } 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+
+<div class="max-w-6xl mx-auto space-y-6">
+    <div id="loadingIndicator" class="fixed top-4 right-4 bg-yellow-100 p-2 rounded text-sm text-yellow-700 hidden">Memuat data...</div>
+    <div id="messageBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-100 p-2 rounded text-sm text-green-700 hidden"></div>
+    <div id="errorBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 p-2 rounded text-sm text-red-700 hidden"></div>
+
+    <h1 class="text-3xl font-bold mb-4 text-gray-800">Manajemen Transaksi</h1>
+
+    <div id="layer1" class="bg-white p-6 rounded-xl shadow">
+        <h2 class="text-xl font-semibold mb-4">Daftar Transaksi (Header)</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse" id="headerTable">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="p-2 text-left">ID Unik</th>
+                        <th class="p-2 text-left">PIC/Tgl</th>
+                        <th class="p-2 text-left">Kegiatan / Brand</th>
+                        <th class="p-2 text-right">Grand Total</th>
+                        <th class="p-2 text-left">Status</th>
+                        <th class="p-2 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="headerBody">
+                    <tr><td colspan="6" class="p-4 text-center text-gray-500">Memuat data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="layer2" class="bg-white p-6 rounded-xl shadow hidden">
+        <div class="flex justify-between items-center mb-4">
+            <button onclick="showLayer(1)" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; Kembali ke Daftar Transaksi</button>
+            <button onclick="openAddItemModal()" class="px-4 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600">
+                + Tambah Item
+            </button>
+        </div>
+        <h2 class="text-xl font-semibold mb-2">Detail Transaksi: <span id="detailUniqueID" class="text-indigo-600"></span></h2>
+        <p class="mb-4 text-sm text-gray-600">Item Produk yang dimasukkan:</p>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse" id="detailTable">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="p-2 text-left">Nama Produk (Kode)</th>
+                        <th class="p-2 text-left">Jml</th>
+                        <th class="p-2 text-left">Harga</th>
+                        <th class="p-2 text-right">Total</th>
+                        <th class="p-2 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="detailBody">
+                    <tr><td colspan="5" class="p-4 text-center text-gray-500">Memuat detail item...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <h3 class="text-lg font-bold mb-4">Edit Item Produk</h3>
+        <input type="hidden" id="editRowIndex">
+        <input type="hidden" id="editHarga">
+
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700">Nama Produk</label>
+            <input type="text" id="editNamaProduk" class="mt-1 p-2 border rounded w-full" required />
+        </div>
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700">Jumlah</label>
+            <input type="number" id="editJumlah" class="mt-1 p-2 border rounded w-full" min="1" required />
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Total</label>
+            <input type="text" id="editTotal" class="mt-1 p-2 border rounded w-full bg-gray-50" readonly />
+        </div>
+        
+        <div class="flex justify-end space-x-2">
+            <button onclick="closeModal()" class="px-4 py-2 border rounded text-gray-700">Batal</button>
+            <button id="saveEditBtn" class="px-4 py-2 bg-indigo-600 text-white rounded">Simpan Perubahan</button>
+        </div>
+    </div>
+</div>
+
+<div id="addItemModal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <h3 class="text-lg font-bold mb-4">Tambah Item Baru</h3>
+        <input type="hidden" id="addItemUniqueID">
+        <input type="hidden" id="addItemHargaRaw">
+        <input type="hidden" id="addItemKode">   <input type="hidden" id="addItemStok">   <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700">Nama Produk</label>
+            <input 
+                type="text" 
+                id="addItemNamaProduk" 
+                list="masterProductsDatalist" 
+                class="mt-1 p-2 border rounded w-full" 
+                placeholder="Ketik nama produk..."
+                required 
+            />
+            <datalist id="masterProductsDatalist">
+                </datalist>
+        </div>
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700">Harga Satuan</label>
+            <input type="text" id="addItemHargaDisplay" class="mt-1 p-2 border rounded w-full bg-gray-100" readonly />
+        </div>
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700">Jumlah</label>
+            <input type="number" id="addItemJumlah" class="mt-1 p-2 border rounded w-full" min="1" required />
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Total</label>
+            <input type="text" id="addItemTotal" class="mt-1 p-2 border rounded w-full bg-gray-50" readonly />
+        </div>
+        
+        <div class="flex justify-end space-x-2">
+            <button onclick="closeAddItemModal()" class="px-4 py-2 border rounded text-gray-700">Batal</button>
+            <button id="saveNewItemBtn" class="px-4 py-2 bg-green-600 text-white rounded">Simpan Item</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ====================================================================
+    // !!! PENTING: GANTI INI DENGAN URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA !!!
+    const API_URL = "https://script.google.com/macros/s/AKfycbwHaGTIVYBsI8PGjF_egBpGkx7gE1_8lSK3Hmll97eMQq0JIU1Ie8rJsY9AGM6WexuLUA/exec"; 
+    // ====================================================================
+
+    let currentUniqueID = null; 
+    let masterProducts = []; 
+
+    /* ——— UTILS (Perbaikan Numerik) ——— */
+    
+    // Perbaikan: Memastikan angka diformat dengan benar (float ke string IDR)
+    function formatRibuan(n) { 
+        if (n === null || n === undefined || isNaN(n)) return "0,00";
+        // Pembulatan ke 2 desimal di awal untuk mencegah floating point noise
+        const roundedN = Math.round(n * 100) / 100;
+
+        return new Intl.NumberFormat('id-ID', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        }).format(roundedN);
+    }
+    
+    // Perbaikan: Memastikan string berformat IDR (10.000,00) diubah menjadi float yang benar (10000.00)
+    function parseNumber(s) { 
+        if (!s) return 0;
+        let str = String(s);
+        
+        // Hapus pemisah ribuan (titik)
+        str = str.replace(/\./g, '');
+        
+        // Ganti pemisah desimal (koma) menjadi titik
+        str = str.replace(/,/g, '.');
+        
+        return parseFloat(str) || 0; 
+    }
+
+    /* ——— MESSAGE & LOADING ——— */
+    function showLoader(msg = "Memuat data...") { 
+        const indicator = document.getElementById("loadingIndicator");
+        indicator.textContent = msg;
+        indicator.classList.remove("hidden"); 
+    }
+    function hideLoader() { document.getElementById("loadingIndicator").classList.add("hidden"); }
+
+    function showMessage(msg) {
+        const box = document.getElementById("messageBox");
+        box.textContent = msg;
+        box.classList.remove("hidden");
+        setTimeout(() => box.classList.add("hidden"), 3000);
+    }
+    function showError(msg) {
+        const box = document.getElementById("errorBox");
+        box.textContent = msg;
+        box.classList.remove("hidden");
+        setTimeout(() => box.classList.add("hidden"), 5000);
+    }
+
+    /* ——— LAYER MANAGEMENT ——— */
+    function showLayer(layerNumber) {
+        document.getElementById("layer1").classList.toggle('hidden', layerNumber !== 1);
+        document.getElementById("layer2").classList.toggle('hidden', layerNumber !== 2);
+    }
+
+    /* ——— MASTER DATA LOGIC ——— */
+
+    async function loadMasterData() {
+        try {
+            const res = await fetch(API_URL + "?action=getMaster", { cache: "no-store" }); 
+            const data = await res.json();
+            
+            if (data.error) throw new Error(data.error);
+            
+            masterProducts = data; 
+            populateDatalist();
+
+        } catch (err) {
+            showError("Gagal memuat Master Data Produk: " + err.message);
+        }
+    }
+
+    // Mengisi DATALIST untuk Autocomplete
+    function populateDatalist() {
+        const datalist = document.getElementById('masterProductsDatalist');
+        datalist.innerHTML = ''; 
+        
+        masterProducts.forEach(product => { 
+            if (product.nama) { 
+                const option = document.createElement('option');
+                option.value = product.nama;
+                
+                const safeHarga = parseFloat(product.harga) || 0; 
+                option.setAttribute('data-harga', safeHarga); 
+                
+                datalist.appendChild(option);
+            }
+        });
+    }
+
+    /* ——— MODAL LOGIC (EDIT ITEM) ——— */
+    function openModal(item) {
+        // Harga yang diterima dari API sudah bersih karena logic pembulatan di GAS
+        const safeHarga = parseFloat(item.harga); 
+
+        document.getElementById('editRowIndex').value = item.rowIndex;
+        document.getElementById('editHarga').value = safeHarga; // Harga RAW
+        document.getElementById('editNamaProduk').value = item.nama;
+        document.getElementById('editJumlah').value = item.jumlah;
+        document.getElementById('editTotal').value = formatRibuan(item.total); 
+        
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+
+    document.getElementById('editJumlah').addEventListener('input', () => {
+        const harga = parseFloat(document.getElementById('editHarga').value); 
+        const jumlah = parseFloat(document.getElementById('editJumlah').value); 
+        
+        if (jumlah < 1) {
+            document.getElementById('editTotal').value = formatRibuan(0);
+            return;
+        }
+
+        const total = jumlah * harga;
+        document.getElementById('editTotal').value = formatRibuan(total);
+    });
+
+    /* ——— MODAL LOGIC (ADD NEW ITEM) ——— */
+    function openAddItemModal() {
+        document.getElementById('addItemUniqueID').value = currentUniqueID;
+        document.getElementById('addItemNamaProduk').value = ''; 
+        document.getElementById('addItemHargaRaw').value = 0;
+        document.getElementById('addItemKode').value = '';
+        document.getElementById('addItemStok').value = 0;
+        document.getElementById('addItemHargaDisplay').value = formatRibuan(0);
+        document.getElementById('addItemJumlah').value = 1;
+        document.getElementById('addItemTotal').value = formatRibuan(0);
+        
+        document.getElementById('addItemModal').classList.remove('hidden');
+        updateAddItemTotal(); 
+    }
+
+    function closeAddItemModal() {
+        document.getElementById('addItemModal').classList.add('hidden');
+    }
+
+    // Event Listeners untuk kalkulasi otomatis (input Nama Produk dan Jumlah)
+    document.getElementById('addItemNamaProduk').addEventListener('input', updateAddItemTotal);
+    document.getElementById('addItemJumlah').addEventListener('input', updateAddItemTotal);
+
+    function updateAddItemTotal() {
+        const inputNama = document.getElementById('addItemNamaProduk').value.trim();
+        const inputJumlah = parseFloat(document.getElementById('addItemJumlah').value) || 0;
+        
+        // Cari produk di array masterProducts (case-insensitive)
+        const selectedProduct = masterProducts.find(p => p.nama.toLowerCase() === inputNama.toLowerCase());
+
+        let harga = 0;
+        let kode = "";
+        let stok = 0;
+        
+        if (selectedProduct) {
+            harga = parseFloat(selectedProduct.harga) || 0; 
+            kode = selectedProduct.kode || "";     // Ambil Kode
+            stok = parseFloat(selectedProduct.stok) || 0;  // Ambil Stok
+        }
+        
+        // Simpan data RAW ke input hidden
+        document.getElementById('addItemHargaRaw').value = harga;
+        document.getElementById('addItemKode').value = kode;     // SIMPAN KODE
+        document.getElementById('addItemStok').value = stok;     // SIMPAN STOK
+        
+        // Tampilkan harga yang diformat
+        document.getElementById('addItemHargaDisplay').value = formatRibuan(harga); 
+
+        // Hitung total
+        const total = inputJumlah * harga;
+        document.getElementById('addItemTotal').value = formatRibuan(total);
+    }
+
+
+    /* ——— API CALLS ——— */
+    
+    async function loadRekapHeaders() {
+        const body = document.getElementById("headerBody");
+        body.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500"><span class="loader"></span> Memuat data transaksi...</td></tr>';
+        showLoader("Memuat daftar transaksi...");
+
+        try {
+            const res = await fetch(API_URL + "?action=getRekapHeaders", { cache: "no-store" });
+            const data = await res.json();
+            body.innerHTML = ''; 
+
+            if (!data || data.error) throw new Error(data.error || "Gagal memuat header rekap.");
+
+            data.forEach(header => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b hover:bg-gray-50";
+                tr.innerHTML = `
+                    <td data-label="ID Unik" class="p-2 font-mono text-xs">${header.uniqueID}</td>
+                    <td data-label="PIC/Tanggal" class="p-2 text-xs">${header.namaUser}<br><span class="text-gray-500">${header.tanggal}</span></td>
+                    <td data-label="Kegiatan / Brand" class="p-2 text-xs">${header.kegiatan}<br><span class="text-indigo-600 font-semibold">${header.inputBrand}</span></td>
+                    <td data-label="Grand Total" class="p-2 text-right font-bold text-green-700">${formatRibuan(header.grandTotal)}</td>
+                    <td data-label="Status" class="p-2"><span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${header.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">${header.status}</span></td>
+                    <td data-label="Aksi" class="p-2 text-center">
+                        <button onclick="loadRekapDetails('${header.uniqueID}')" class="px-3 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600">Detail</button>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+
+        } catch (err) {
+            showError("Gagal memuat rekap: " + err.message);
+            body.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ${err.message}</td></tr>`;
+        } finally {
+            hideLoader();
+        }
+    }
+
+    async function loadRekapDetails(uniqueID) {
+        currentUniqueID = uniqueID;
+        document.getElementById("detailUniqueID").textContent = uniqueID;
+        const body = document.getElementById("detailBody");
+        
+        if (document.getElementById("detailFooter")) {
+            document.getElementById("detailFooter").remove();
+        }
+
+        body.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500"><span class="loader"></span> Memuat detail item...</td></tr>';
+        showLoader("Memuat detail...");
+        showLayer(2);
+
+        try {
+            const res = await fetch(API_URL + "?action=getRekapDetails&uniqueID=" + uniqueID, { cache: "no-store" });
+            const responseData = await res.json();
+            body.innerHTML = ''; 
+
+            if (!responseData || responseData.error) throw new Error(responseData.error || "Gagal memuat detail rekap.");
+
+            const details = responseData.details;
+            const grandTotal = responseData.grandTotal;
+
+            if (details.length === 0) {
+                 body.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Tidak ada item ditemukan.</td></tr>';
+                 const table = document.getElementById("detailTable");
+                 table.insertAdjacentHTML('beforeend', `<tfoot id="detailFooter">
+                    <tr class="bg-gray-200 font-bold">
+                        <td colspan="3" class="p-2 text-right">GRAND TOTAL</td>
+                        <td data-label="Total" class="p-2 text-right text-green-700">${formatRibuan(0)}</td>
+                        <td data-label="Aksi" class="p-2"></td>
+                    </tr>
+                 </tfoot>`);
+                 return;
+            }
+
+            // 1. Tambahkan baris untuk setiap item
+            details.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b hover:bg-gray-50";
+                tr.innerHTML = `
+                    <td data-label="Nama Produk (Kode)" class="p-2">${item.nama}<br><span class="text-gray-500 text-xs">${item.kode} (Stok: ${item.stok})</span></td>
+                    <td data-label="Jumlah" class="p-2 font-semibold">${item.jumlah}</td>
+                    <td data-label="Harga" class="p-2">${formatRibuan(item.harga)}</td>
+                    <td data-label="Total" class="p-2 text-right font-semibold">${formatRibuan(item.total)}</td>
+                    <td data-label="Aksi" class="p-2 flex space-x-2 justify-center">
+                        <button onclick='openModal(${JSON.stringify(item)})' class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600">Edit</button>
+                        <button onclick="deleteItemHandler(${item.rowIndex}, '${item.nama}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">Hapus</button>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+            
+
+            // 2. Tambahkan Grand Total di footer tabel
+            const table = document.getElementById("detailTable");
+            const footer = document.createElement('tfoot');
+            footer.id = "detailFooter";
+            footer.innerHTML = `
+                <tr class="bg-gray-200 font-bold">
+                    <td colspan="3" class="p-2 text-right">GRAND TOTAL</td>
+                    <td data-label="Total" class="p-2 text-right text-green-700">${formatRibuan(grandTotal)}</td>
+                    <td data-label="Aksi" class="p-2"></td>
+                </tr>
+            `;
+            table.appendChild(footer);
+
+
+        } catch (err) {
+            showError("Gagal memuat detail: " + err.message);
+            body.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">Error: ${err.message}</td></tr>`;
+        } finally {
+            hideLoader();
+        }
+    }
+
+    // UPDATE ITEM (Action)
+    document.getElementById('saveEditBtn').onclick = async () => {
+        const btn = document.getElementById('saveEditBtn');
+        const oldLabel = btn.innerHTML;
+        btn.innerHTML = `<span class="loader"></span> Menyimpan...`;
+        btn.disabled = true;
+
+        const rowIndex = document.getElementById('editRowIndex').value;
+        const newNama = document.getElementById('editNamaProduk').value;
+        const newJumlah = parseFloat(document.getElementById('editJumlah').value); 
+        // Mengambil Total dengan parseNumber karena berasal dari input yang sudah diformat
+        const newTotal = parseNumber(document.getElementById('editTotal').value); 
+
+        if (!newNama || newJumlah < 1) {
+            showError("Nama Produk dan Jumlah wajib diisi.");
+            btn.innerHTML = oldLabel;
+            btn.disabled = false;
+            return;
+        }
+
+        try {
+            const res = await fetch(API_URL + "?action=updateItem", {
+                method: "POST",
+                headers: { 'Content-Type': 'text/plain' }, 
+                body: JSON.stringify({
+                    rowIndex: rowIndex,
+                    newNama: newNama,
+                    newJumlah: newJumlah,
+                    newTotal: newTotal 
+                })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            showMessage("✅ Item berhasil diperbarui!");
+            closeModal();
+            loadRekapDetails(currentUniqueID); 
+
+        } catch (err) {
+            showError("❌ Gagal menyimpan: " + err.message);
+        } finally {
+            btn.innerHTML = oldLabel;
+            btn.disabled = false;
+        }
+    };
+    
+    // ADD NEW ITEM (Action)
+    document.getElementById('saveNewItemBtn').onclick = async () => {
+        const btn = document.getElementById('saveNewItemBtn');
+        const oldLabel = btn.innerHTML;
+        btn.innerHTML = `<span class="loader"></span> Menyimpan...`;
+        btn.disabled = true;
+
+        const uniqueID = document.getElementById('addItemUniqueID').value;
+        const nama = document.getElementById('addItemNamaProduk').value;
+        const jumlah = parseFloat(document.getElementById('addItemJumlah').value);
+        
+        // Ambil data baru dari hidden field
+        const kode = document.getElementById('addItemKode').value;    // BARU
+        const stok = parseFloat(document.getElementById('addItemStok').value);    // BARU
+        const harga = parseFloat(document.getElementById('addItemHargaRaw').value);
+        const total = parseNumber(document.getElementById('addItemTotal').value); // Total diambil dari input display lalu di-parse
+
+        if (!nama || jumlah < 1 || harga <= 0) {
+            showError("Nama Produk, Jumlah (min 1), dan Harga wajib diisi. Pastikan nama produk benar dan ada harganya.");
+            btn.innerHTML = oldLabel;
+            btn.disabled = false;
+            return;
+        }
+
+        try {
+            const res = await fetch(API_URL + "?action=addItemToRekap", {
+                method: "POST",
+                headers: { 'Content-Type': 'text/plain' }, 
+                body: JSON.stringify({
+                    uniqueID: uniqueID,
+                    nama: nama,
+                    jumlah: jumlah,
+                    kode: kode,      // KIRIM KODE
+                    stok: stok,      // KIRIM STOK
+                    harga: harga,
+                    total: total
+                })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            showMessage("✅ Item baru berhasil ditambahkan!");
+            closeAddItemModal();
+            loadRekapDetails(uniqueID); 
+
+        } catch (err) {
+            showError("❌ Gagal menyimpan item baru: " + err.message);
+        } finally {
+            btn.innerHTML = oldLabel;
+            btn.disabled = false;
+        }
+    };
+
+    // DELETE ITEM (Action)
+    async function deleteItemHandler(rowIndex, namaProduk) {
+        if (!confirm(`Yakin ingin menghapus item "${namaProduk}" (Baris ${rowIndex})?`)) return;
+
+        showLoader(`Menghapus item ${namaProduk}...`);
+
+        try {
+            const res = await fetch(API_URL + "?action=deleteItem", {
+                method: "POST",
+                headers: { 'Content-Type': 'text/plain' }, 
+                body: JSON.stringify({ rowIndex: rowIndex })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            showMessage("🗑️ Item berhasil dihapus!");
+            loadRekapDetails(currentUniqueID); 
+            
+        } catch (err) {
+            showError("❌ Gagal menghapus: " + err.message);
+        } finally {
+            hideLoader();
+        }
+    }
+
+
+    /* —— INIT —— */
+    (function init() {
+        loadMasterData(); // Muat data master produk
+        loadRekapHeaders();
+    })();
+</script>
+</body>
+</html>
