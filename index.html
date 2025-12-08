@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Rekap Transaksi</title>
+    <title>Rekap NJ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .loader {
@@ -33,10 +33,10 @@
     <div id="messageBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-100 p-2 rounded text-sm text-green-700 hidden"></div>
     <div id="errorBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 p-2 rounded text-sm text-red-700 hidden"></div>
 
-    <h1 class="text-3xl font-bold mb-4 text-gray-800">Manajemen Transaksi</h1>
+    <h1 class="text-3xl font-bold mb-4 text-gray-800">Manajemen NJ</h1>
 
     <div id="layer1" class="bg-white p-6 rounded-xl shadow">
-        <h2 class="text-xl font-semibold mb-4">Daftar Transaksi (Header)</h2>
+        <h2 class="text-xl font-semibold mb-4">Daftar NJ</h2>
         <div class="overflow-x-auto">
             <table class="w-full text-sm border-collapse" id="headerTable">
                 <thead class="bg-gray-100">
@@ -58,12 +58,12 @@
 
     <div id="layer2" class="bg-white p-6 rounded-xl shadow hidden">
         <div class="flex justify-between items-center mb-4">
-            <button onclick="showLayer(1)" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; Kembali ke Daftar Transaksi</button>
+            <button onclick="showLayer(1)" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; Kembali ke Daftar NJ</button>
             <button onclick="openAddItemModal()" class="px-4 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600">
                 + Tambah Item
             </button>
         </div>
-        <h2 class="text-xl font-semibold mb-2">Detail Transaksi: <span id="detailUniqueID" class="text-indigo-600"></span></h2>
+        <h2 class="text-xl font-semibold mb-2">Detail NJ: <span id="detailUniqueID" class="text-indigo-600"></span></h2>
         <p class="mb-4 text-sm text-gray-600">Item Produk yang dimasukkan:</p>
 
         <div class="overflow-x-auto">
