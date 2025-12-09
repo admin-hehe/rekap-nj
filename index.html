@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Rekap NJ</title>
+    <title>Rekap Transaksi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .loader {
@@ -33,10 +33,10 @@
     <div id="messageBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-100 p-2 rounded text-sm text-green-700 hidden"></div>
     <div id="errorBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 p-2 rounded text-sm text-red-700 hidden"></div>
 
-    <h1 class="text-3xl font-bold mb-4 text-gray-800">Manajemen NJ</h1>
+    <h1 class="text-3xl font-bold mb-4 text-gray-800">Manajemen Transaksi</h1>
 
     <div id="layer1" class="bg-white p-6 rounded-xl shadow">
-        <h2 class="text-xl font-semibold mb-4">Daftar NJ</h2>
+        <h2 class="text-xl font-semibold mb-4">Daftar Transaksi (Header)</h2>
         <div class="overflow-x-auto">
             <table class="w-full text-sm border-collapse" id="headerTable">
                 <thead class="bg-gray-100">
@@ -58,12 +58,12 @@
 
     <div id="layer2" class="bg-white p-6 rounded-xl shadow hidden">
         <div class="flex justify-between items-center mb-4">
-            <button onclick="showLayer(1)" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; Kembali ke Daftar NJ</button>
+            <button onclick="showLayer(1)" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; Kembali ke Daftar Transaksi</button>
             <button onclick="openAddItemModal()" class="px-4 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600">
                 + Tambah Item
             </button>
         </div>
-        <h2 class="text-xl font-semibold mb-2">Detail NJ: <span id="detailUniqueID" class="text-indigo-600"></span></h2>
+        <h2 class="text-xl font-semibold mb-2">Detail Transaksi: <span id="detailUniqueID" class="text-indigo-600"></span></h2>
         <p class="mb-4 text-sm text-gray-600">Item Produk yang dimasukkan:</p>
 
         <div class="overflow-x-auto">
@@ -93,7 +93,7 @@
 
         <div class="mb-3">
             <label class="block text-sm font-medium text-gray-700">Nama Produk</label>
-            <input type="text" id="editNamaProduk" class="mt-1 p-2 border rounded w-full" required />
+            <input type="text" id="editNamaProduk" class="mt-1 p-2 border rounded w-full" readonly />
         </div>
         <div class="mb-3">
             <label class="block text-sm font-medium text-gray-700">Jumlah</label>
@@ -116,19 +116,23 @@
         <h3 class="text-lg font-bold mb-4">Tambah Item Baru</h3>
         <input type="hidden" id="addItemUniqueID">
         <input type="hidden" id="addItemHargaRaw">
-        <input type="hidden" id="addItemKode">   <input type="hidden" id="addItemStok">   <div class="mb-3">
+        <input type="hidden" id="addItemKode"> 
+        <input type="hidden" id="addItemStok"> 
+
+        <div class="mb-3 relative"> 
             <label class="block text-sm font-medium text-gray-700">Nama Produk</label>
             <input 
                 type="text" 
                 id="addItemNamaProduk" 
-                list="masterProductsDatalist" 
                 class="mt-1 p-2 border rounded w-full" 
                 placeholder="Ketik nama produk..."
+                autocomplete="off"
                 required 
             />
-            <datalist id="masterProductsDatalist">
-                </datalist>
-        </div>
+            <div id="addItemAutocompleteList" class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto hidden">
+                </div>
+            </div>
+        
         <div class="mb-3">
             <label class="block text-sm font-medium text-gray-700">Harga Satuan</label>
             <input type="text" id="addItemHargaDisplay" class="mt-1 p-2 border rounded w-full bg-gray-100" readonly />
@@ -223,30 +227,13 @@
             if (data.error) throw new Error(data.error);
             
             masterProducts = data; 
-            populateDatalist();
-
+            // Fungsi populateDatalist() dihilangkan
         } catch (err) {
             showError("Gagal memuat Master Data Produk: " + err.message);
         }
     }
 
-    // Mengisi DATALIST untuk Autocomplete
-    function populateDatalist() {
-        const datalist = document.getElementById('masterProductsDatalist');
-        datalist.innerHTML = ''; 
-        
-        masterProducts.forEach(product => { 
-            if (product.nama) { 
-                const option = document.createElement('option');
-                option.value = product.nama;
-                
-                const safeHarga = parseFloat(product.harga) || 0; 
-                option.setAttribute('data-harga', safeHarga); 
-                
-                datalist.appendChild(option);
-            }
-        });
-    }
+    // Fungsi populateDatalist() DIHAPUS
 
     /* ——— MODAL LOGIC (EDIT ITEM) ——— */
     function openModal(item) {
@@ -280,15 +267,22 @@
     });
 
     /* ——— MODAL LOGIC (ADD NEW ITEM) ——— */
+    const addItemNamaProduk = document.getElementById('addItemNamaProduk');
+    const addItemAutocompleteList = document.getElementById('addItemAutocompleteList');
+
     function openAddItemModal() {
         document.getElementById('addItemUniqueID').value = currentUniqueID;
-        document.getElementById('addItemNamaProduk').value = ''; 
+        // Reset input fields
+        addItemNamaProduk.value = ''; 
         document.getElementById('addItemHargaRaw').value = 0;
         document.getElementById('addItemKode').value = '';
         document.getElementById('addItemStok').value = 0;
         document.getElementById('addItemHargaDisplay').value = formatRibuan(0);
         document.getElementById('addItemJumlah').value = 1;
         document.getElementById('addItemTotal').value = formatRibuan(0);
+        
+        // Pastikan list saran tersembunyi saat modal dibuka
+        addItemAutocompleteList.classList.add('hidden'); 
         
         document.getElementById('addItemModal').classList.remove('hidden');
         updateAddItemTotal(); 
@@ -298,12 +292,60 @@
         document.getElementById('addItemModal').classList.add('hidden');
     }
 
-    // Event Listeners untuk kalkulasi otomatis (input Nama Produk dan Jumlah)
-    document.getElementById('addItemNamaProduk').addEventListener('input', updateAddItemTotal);
+    // Event Listeners untuk Autocomplete dan Kalkulasi
+    addItemNamaProduk.addEventListener('input', showAddItemSuggestions);
+    addItemNamaProduk.addEventListener('change', updateAddItemTotal); // Dijalankan setelah pemilihan atau keluar focus
     document.getElementById('addItemJumlah').addEventListener('input', updateAddItemTotal);
 
+    /* ——— CUSTOM AUTOCOMPLETE LOGIC UNTUK ADD ITEM MODAL ——— */
+
+    function showAddItemSuggestions() {
+        const query = addItemNamaProduk.value.toLowerCase().trim();
+        addItemAutocompleteList.innerHTML = '';
+        updateAddItemTotal(); // Panggil kalkulasi saat mengetik
+
+        if (query.length < 1) {
+            addItemAutocompleteList.classList.add('hidden');
+            return;
+        }
+
+        const filteredProducts = masterProducts.filter(p => p.nama.toLowerCase().includes(query));
+
+        if (filteredProducts.length === 0) {
+            addItemAutocompleteList.classList.add('hidden');
+            return;
+        }
+        
+        filteredProducts.forEach(product => {
+            const div = document.createElement('div');
+            div.className = 'p-2 cursor-pointer hover:bg-indigo-100 text-sm';
+            div.textContent = product.nama;
+            
+            div.addEventListener('click', function() {
+                addItemNamaProduk.value = product.nama;
+                addItemAutocompleteList.classList.add('hidden');
+                updateAddItemTotal(); // Panggil fungsi untuk mengisi harga dan stok
+            });
+            addItemAutocompleteList.appendChild(div);
+        });
+
+        addItemAutocompleteList.classList.remove('hidden');
+    }
+
+    // Sembunyikan daftar saran saat mengklik di luar input atau daftar saran itu sendiri
+    document.addEventListener('click', function(e) {
+        if (document.getElementById('addItemModal').classList.contains('hidden')) return; // Hanya berlaku jika modal terbuka
+        
+        const isClickedOutside = !addItemNamaProduk.contains(e.target) && !addItemAutocompleteList.contains(e.target);
+        
+        if (isClickedOutside) {
+            addItemAutocompleteList.classList.add('hidden');
+        }
+    });
+    // ——— AKHIR CUSTOM AUTOCOMPLETE ———
+    
     function updateAddItemTotal() {
-        const inputNama = document.getElementById('addItemNamaProduk').value.trim();
+        const inputNama = addItemNamaProduk.value.trim();
         const inputJumlah = parseFloat(document.getElementById('addItemJumlah').value) || 0;
         
         // Cari produk di array masterProducts (case-insensitive)
@@ -315,14 +357,14 @@
         
         if (selectedProduct) {
             harga = parseFloat(selectedProduct.harga) || 0; 
-            kode = selectedProduct.kode || "";     // Ambil Kode
-            stok = parseFloat(selectedProduct.stok) || 0;  // Ambil Stok
+            kode = selectedProduct.kode || ""; 
+            stok = parseFloat(selectedProduct.stok) || 0; 
         }
         
         // Simpan data RAW ke input hidden
         document.getElementById('addItemHargaRaw').value = harga;
-        document.getElementById('addItemKode').value = kode;     // SIMPAN KODE
-        document.getElementById('addItemStok').value = stok;     // SIMPAN STOK
+        document.getElementById('addItemKode').value = kode; 
+        document.getElementById('addItemStok').value = stok; 
         
         // Tampilkan harga yang diformat
         document.getElementById('addItemHargaDisplay').value = formatRibuan(harga); 
@@ -355,7 +397,19 @@
                     <td data-label="PIC/Tanggal" class="p-2 text-xs">${header.namaUser}<br><span class="text-gray-500">${header.tanggal}</span></td>
                     <td data-label="Kegiatan / Brand" class="p-2 text-xs">${header.kegiatan}<br><span class="text-indigo-600 font-semibold">${header.inputBrand}</span></td>
                     <td data-label="Grand Total" class="p-2 text-right font-bold text-green-700">${formatRibuan(header.grandTotal)}</td>
-                    <td data-label="Status" class="p-2"><span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${header.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">${header.status}</span></td>
+                    <td data-label="Status" class="p-2">
+			    <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${
+				header.status === 'Done' 
+				? 'bg-green-100 text-green-800' // Hijau untuk Done
+				: header.status === 'Pengajuan' 
+				? 'bg-blue-100 text-blue-800' // Biru untuk Pengajuan
+				: header.status === 'Kendala' 
+				? 'bg-red-100 text-red-800' // Merah untuk Kendala
+				: 'bg-yellow-100 text-yellow-800' // Kuning untuk Pending/Default
+			    }">
+				${header.status}
+			    </span>
+			</td>
                     <td data-label="Aksi" class="p-2 text-center">
                         <button onclick="loadRekapDetails('${header.uniqueID}')" class="px-3 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600">Detail</button>
                     </td>
@@ -403,7 +457,7 @@
                         <td data-label="Total" class="p-2 text-right text-green-700">${formatRibuan(0)}</td>
                         <td data-label="Aksi" class="p-2"></td>
                     </tr>
-                 </tfoot>`);
+                   </tfoot>`);
                  return;
             }
 
@@ -505,7 +559,7 @@
         const jumlah = parseFloat(document.getElementById('addItemJumlah').value);
         
         // Ambil data baru dari hidden field
-        const kode = document.getElementById('addItemKode').value;    // BARU
+        const kode = document.getElementById('addItemKode').value;   // BARU
         const stok = parseFloat(document.getElementById('addItemStok').value);    // BARU
         const harga = parseFloat(document.getElementById('addItemHargaRaw').value);
         const total = parseNumber(document.getElementById('addItemTotal').value); // Total diambil dari input display lalu di-parse
@@ -525,8 +579,8 @@
                     uniqueID: uniqueID,
                     nama: nama,
                     jumlah: jumlah,
-                    kode: kode,      // KIRIM KODE
-                    stok: stok,      // KIRIM STOK
+                    kode: kode,     // KIRIM KODE
+                    stok: stok,     // KIRIM STOK
                     harga: harga,
                     total: total
                 })
