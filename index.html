@@ -5,641 +5,493 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Rekap NJ</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        .loader {
-            border: 2px solid #fff; border-top: 2px solid transparent; border-radius: 50%; width: 14px; height: 14px; animation: spin 0.6s linear infinite; display: inline-block; vertical-align: middle;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .loader { border: 2px solid currentColor; border-top: 2px solid transparent; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.6s linear infinite; display: inline-block; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        /* Modal Style */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; padding: 24px; border-radius: 8px; width: 90%; max-width: 400px; }
-        /* Mobile Table Optimization */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        
+        /* Mobile Table */
         @media (max-width: 640px) { 
-            #headerTable thead, #detailTable thead { display: none; } 
-            #headerTable tr, #detailTable tr { display: block; margin-bottom: 12px; border: 1px solid #e5e7eb; padding: 10px; border-radius: 8px; } 
-            #headerTable td, #detailTable td { display: flex; justify-content: space-between; padding: 6px 0; border: none; } 
-            #headerTable td::before, #detailTable td::before { content: attr(data-label); font-weight: 600; color: #374151; margin-right: 8px; }
-            /* Penyesuaian untuk footer Grand Total di mobile */
-            #detailFooter td:nth-child(1) { justify-content: flex-end; } 
-            #detailFooter td:nth-child(2) { justify-content: flex-end; }
-            #detailFooter td:nth-child(3) { justify-content: space-between; } 
+            .responsive-table thead { display: none; } 
+            .responsive-table tr { display: block; margin-bottom: 1rem; background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1rem; } 
+            .dark .responsive-table tr { background: #1f2937; border: 1px solid #374151; }
+            .responsive-table td { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; } 
+            .responsive-table td::before { content: attr(data-label); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: #6b7280; }
         }
+
+        /* Toast Animation */
+        .toast-enter { transform: translateY(-20px); opacity: 0; }
+        .toast-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-6">
+<body class="bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-100 min-h-screen transition-colors duration-300">
 
-<div class="max-w-6xl mx-auto space-y-6">
-    <div id="loadingIndicator" class="fixed top-4 right-4 bg-yellow-100 p-2 rounded text-sm text-yellow-700 hidden">Memuat data...</div>
-    <div id="messageBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-100 p-2 rounded text-sm text-green-700 hidden"></div>
-    <div id="errorBox" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 p-2 rounded text-sm text-red-700 hidden"></div>
+<div id="toastContainer" class="fixed top-5 right-5 z-[2000] flex flex-col gap-2 pointer-events-none"></div>
 
-    <h1 class="text-3xl font-bold mb-4 text-gray-800">Manajemen Data</h1>
-
-    <div id="layer1" class="bg-white p-6 rounded-xl shadow">
-        <h2 class="text-xl font-semibold mb-4">Daftar NJ</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm border-collapse" id="headerTable">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="p-2 text-left">ID Unik</th>
-                        <th class="p-2 text-left">PIC/Tgl</th>
-                        <th class="p-2 text-left">Kegiatan / Brand</th>
-                        <th class="p-2 text-right">Grand Total</th>
-                        <th class="p-2 text-left">Status</th>
-                        <th class="p-2 text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="headerBody">
-                    <tr><td colspan="6" class="p-4 text-center text-gray-500">Memuat data...</td></tr>
-                </tbody>
-            </table>
+<div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <div class="fixed top-4 inset-x-4 z-50 flex flex-col items-center pointer-events-none space-y-2">
+        <div id="loadingIndicator" class="hidden bg-white dark:bg-gray-800 shadow-xl border border-blue-100 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-medium flex items-center space-x-2 text-blue-600 pointer-events-auto">
+            <span class="loader"></span> <span id="loadingText">Memuat data...</span>
         </div>
     </div>
 
-    <div id="layer2" class="bg-white p-6 rounded-xl shadow hidden">
-        <div class="flex justify-between items-center mb-4">
-            <button onclick="showLayer(1)" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; Kembali ke Daftar NJ</button>
-            <button onclick="openAddItemModal()" class="px-4 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600">
-                + Tambah Item
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Rekap NJ</h1>
+            <p class="text-slate-500 dark:text-gray-400 mt-1 text-sm">Kelola dan pantau seluruh transaksi NJ Anda.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="location.reload()" class="p-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg hover:bg-slate-50 transition-all shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
         </div>
-        <h2 class="text-xl font-semibold mb-2">Detail Transaksi: <span id="detailUniqueID" class="text-indigo-600"></span></h2>
-        <p class="mb-4 text-sm text-gray-600">Item Produk yang dimasukkan:</p>
+    </header>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm border-collapse" id="detailTable">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="p-2 text-left">Nama Produk (Kode)</th>
-                        <th class="p-2 text-left">Jml</th>
-                        <th class="p-2 text-left">Harga</th>
-                        <th class="p-2 text-right">Total</th>
-                        <th class="p-2 text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="detailBody">
-                    <tr><td colspan="5" class="p-4 text-center text-gray-500">Memuat detail item...</td></tr>
-                </tbody>
-            </table>
+    <main id="layer1" class="transition-opacity duration-300">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 dark:border-gray-700 flex justify-between items-center">
+                <h2 class="text-lg font-bold">Daftar Transaksi</h2>
+                <span class="text-xs bg-slate-100 dark:bg-gray-700 px-2 py-1 rounded text-slate-500 uppercase tracking-widest font-semibold">Live Data</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm responsive-table" id="headerTable">
+                    <thead class="bg-slate-50 dark:bg-gray-700/50 text-slate-600 dark:text-gray-300">
+                        <tr>
+                            <th class="p-4 text-left font-semibold uppercase tracking-wider">ID Unik</th>
+                            <th class="p-4 text-left font-semibold uppercase tracking-wider">PIC / Tanggal</th>
+                            <th class="p-4 text-left font-semibold uppercase tracking-wider">Kegiatan / Brand</th>
+                            <th class="p-4 text-right font-semibold uppercase tracking-wider">Grand Total</th>
+                            <th class="p-4 text-left font-semibold uppercase tracking-wider">Status</th>
+                            <th class="p-4 text-center font-semibold uppercase tracking-wider">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="headerBody" class="divide-y divide-slate-100 dark:divide-gray-700">
+                        <tr><td colspan="6" class="p-12 text-center text-slate-400"><span class="loader mr-2"></span>Menghubungkan ke server...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+    </main>
+
+    <main id="layer2" class="hidden transition-opacity duration-300">
+        <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <button onclick="showLayer(1)" class="inline-flex items-center text-primary font-semibold hover:underline">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                Kembali ke Daftar
+            </button>
+            <button onclick="openAddItemModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-all flex items-center justify-center font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                Tambah Item Baru
+            </button>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+            <div class="p-6 bg-gradient-to-r from-primary to-indigo-700 text-white">
+                <p class="text-xs opacity-80 uppercase font-bold tracking-widest">Detail Transaksi</p>
+                <h2 class="text-2xl font-bold mt-1" id="detailUniqueID">#NJ-XXXXX</h2>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm responsive-table" id="detailTable">
+                    <thead class="bg-slate-50 dark:bg-gray-700 text-slate-500 dark:text-gray-300">
+                        <tr>
+                            <th class="p-4 text-left font-semibold">Produk & Kode</th>
+                            <th class="p-4 text-center font-semibold">Qty</th>
+                            <th class="p-4 text-left font-semibold">Harga Satuan</th>
+                            <th class="p-4 text-right font-semibold">Subtotal</th>
+                            <th class="p-4 text-center font-semibold">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailBody" class="divide-y divide-slate-100 dark:divide-gray-700"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
 </div>
 
 <div id="editModal" class="modal-overlay hidden">
-    <div class="modal-content">
-        <h3 class="text-lg font-bold mb-4">Edit Item Produk</h3>
-        <input type="hidden" id="editRowIndex">
-        <input type="hidden" id="editHarga">
-
-        <div class="mb-3">
-            <label class="block text-sm font-medium text-gray-700">Nama Produk</label>
-            <input type="text" id="editNamaProduk" class="mt-1 p-2 border rounded w-full" readonly />
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-[95%] max-w-md transform transition-all border border-slate-200 dark:border-gray-700">
+        <h3 class="text-xl font-bold mb-6 flex items-center dark:text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            Edit Item
+        </h3>
+        <input type="hidden" id="editRowIndex"><input type="hidden" id="editHarga">
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Produk</label>
+                <input type="text" id="editNamaProduk" class="w-full p-3 bg-slate-100 dark:bg-gray-900 border-none rounded-xl focus:ring-2 focus:ring-primary" readonly />
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah</label>
+                <input type="number" id="editJumlah" class="w-full p-3 border border-slate-200 dark:border-gray-700 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-primary outline-none" min="1" />
+            </div>
+            <div class="bg-slate-50 dark:bg-gray-900/50 p-4 rounded-xl border border-dashed border-slate-200 dark:border-gray-700">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Estimasi Total</label>
+                <input type="text" id="editTotal" class="w-full bg-transparent text-xl font-bold text-primary dark:text-indigo-400 outline-none" readonly />
+            </div>
         </div>
-        <div class="mb-3">
-            <label class="block text-sm font-medium text-gray-700">Jumlah</label>
-            <input type="number" id="editJumlah" class="mt-1 p-2 border rounded w-full" min="1" required />
-        </div>
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Total</label>
-            <input type="text" id="editTotal" class="mt-1 p-2 border rounded w-full bg-gray-50" readonly />
-        </div>
-        
-        <div class="flex justify-end space-x-2">
-            <button onclick="closeModal()" class="px-4 py-2 border rounded text-gray-700">Batal</button>
-            <button id="saveEditBtn" class="px-4 py-2 bg-indigo-600 text-white rounded">Simpan Perubahan</button>
+        <div class="flex space-x-3 mt-8">
+            <button onclick="closeModal()" class="flex-1 py-3 text-slate-600 dark:text-gray-400 font-medium hover:bg-slate-100 dark:hover:bg-gray-700 rounded-xl transition-all">Batal</button>
+            <button id="saveEditBtn" class="flex-1 py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all">Simpan</button>
         </div>
     </div>
 </div>
 
 <div id="addItemModal" class="modal-overlay hidden">
-    <div class="modal-content">
-        <h3 class="text-lg font-bold mb-4">Tambah Item Baru</h3>
-        <input type="hidden" id="addItemUniqueID">
-        <input type="hidden" id="addItemHargaRaw">
-        <input type="hidden" id="addItemKode"> 
-        <input type="hidden" id="addItemStok"> 
-
-        <div class="mb-3 relative"> 
-            <label class="block text-sm font-medium text-gray-700">Nama Produk</label>
-            <input 
-                type="text" 
-                id="addItemNamaProduk" 
-                class="mt-1 p-2 border rounded w-full" 
-                placeholder="Ketik nama produk..."
-                autocomplete="off"
-                required 
-            />
-            <div id="addItemAutocompleteList" class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto hidden">
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-2xl w-[95%] max-w-lg border border-slate-100 dark:border-gray-700">
+        <h3 class="text-2xl font-extrabold mb-6 dark:text-white tracking-tight">Tambah Item</h3>
+        <input type="hidden" id="addItemUniqueID"><input type="hidden" id="addItemHargaRaw"><input type="hidden" id="addItemKode"><input type="hidden" id="addItemStok">
+        <div class="space-y-4">
+            <div class="relative"> 
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cari Produk</label>
+                <input type="text" id="addItemNamaProduk" class="w-full p-3 border border-slate-200 dark:border-gray-700 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="Ketik nama..." autocomplete="off" />
+                <div id="addItemAutocompleteList" class="absolute z-20 w-full mt-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto hidden divide-y dark:divide-gray-700"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Harga Satuan</label>
+                    <input type="text" id="addItemHargaDisplay" class="w-full p-3 bg-slate-50 dark:bg-gray-900 text-slate-500 rounded-xl border-none font-medium" readonly />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah</label>
+                    <input type="number" id="addItemJumlah" class="w-full p-3 border border-slate-200 dark:border-gray-700 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-primary outline-none" min="1" />
                 </div>
             </div>
-        
-        <div class="mb-3">
-            <label class="block text-sm font-medium text-gray-700">Harga Satuan</label>
-            <input type="text" id="addItemHargaDisplay" class="mt-1 p-2 border rounded w-full bg-gray-100" readonly />
+            <div class="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/50">
+                <label class="block text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-1 text-center">Grand Total Item</label>
+                <input type="text" id="addItemTotal" class="w-full bg-transparent text-center text-2xl font-black text-emerald-700 dark:text-emerald-400 outline-none" readonly />
+            </div>
         </div>
-        <div class="mb-3">
-            <label class="block text-sm font-medium text-gray-700">Jumlah</label>
-            <input type="number" id="addItemJumlah" class="mt-1 p-2 border rounded w-full" min="1" required />
+        <div class="flex space-x-3 mt-8">
+            <button onclick="closeAddItemModal()" class="flex-1 py-3 text-slate-500 dark:text-gray-400 font-medium hover:bg-slate-50 dark:hover:bg-gray-700 rounded-xl transition-all">Batal</button>
+            <button id="saveNewItemBtn" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transition-all">Simpan ke Rekap</button>
         </div>
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Total</label>
-            <input type="text" id="addItemTotal" class="mt-1 p-2 border rounded w-full bg-gray-50" readonly />
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-overlay hidden">
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-[90%] max-w-sm text-center border dark:border-gray-700">
+        <div class="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
         </div>
-        
-        <div class="flex justify-end space-x-2">
-            <button onclick="closeAddItemModal()" class="px-4 py-2 border rounded text-gray-700">Batal</button>
-            <button id="saveNewItemBtn" class="px-4 py-2 bg-green-600 text-white rounded">Simpan Item</button>
+        <h3 class="text-xl font-bold dark:text-white">Hapus Item?</h3>
+        <p id="confirmMsg" class="text-slate-500 dark:text-gray-400 mt-2 text-sm italic"></p>
+        <div class="flex space-x-3 mt-6">
+            <button id="confirmCancel" class="flex-1 py-2.5 text-slate-500 font-medium hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg">Batal</button>
+            <button id="confirmOk" class="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 shadow-lg">Ya, Hapus</button>
         </div>
     </div>
 </div>
 
 <script>
-    // ====================================================================
-    // !!! PENTING: GANTI INI DENGAN URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA !!!
-    const API_URL = "https://script.google.com/macros/s/AKfycbwc7hAGk3GlEEkygC68eAs7Vq_NJ70WC7JDDszUoG9o51KtEkNq2THtQ26F106twnPneA/exec"; 
-    // ====================================================================
-
+    const API_URL = "https://script.google.com/macros/s/AKfycbw8a7Ll9AChPGzNaSQoiMi3qGp40woLWHn0dmtj_RjNQYvTro2eGify60ZoZlgNiaTh6A/exec"; 
     let currentUniqueID = null; 
     let masterProducts = []; 
 
-    /* ——— UTILS (Perbaikan Numerik) ——— */
-    
-    // Perbaikan: Memastikan angka diformat dengan benar (float ke string IDR)
+    /* ——— UTILS ——— */
     function formatRibuan(n) { 
-        if (n === null || n === undefined || isNaN(n)) return "0,00";
-        // Pembulatan ke 2 desimal di awal untuk mencegah floating point noise
+        if (n === null || n === undefined || isNaN(n)) return "Rp 0";
         const roundedN = Math.round(n * 100) / 100;
-
-        return new Intl.NumberFormat('id-ID', { 
-            minimumFractionDigits: 2, 
-            maximumFractionDigits: 2 
-        }).format(roundedN);
+        return "Rp " + new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(roundedN);
     }
-    
-    // Perbaikan: Memastikan string berformat IDR (10.000,00) diubah menjadi float yang benar (10000.00)
     function parseNumber(s) { 
         if (!s) return 0;
-        let str = String(s);
-        
-        // Hapus pemisah ribuan (titik)
-        str = str.replace(/\./g, '');
-        
-        // Ganti pemisah desimal (koma) menjadi titik
-        str = str.replace(/,/g, '.');
-        
+        let str = String(s).replace(/[^\d,]/g, '').replace(/,/g, '.');
         return parseFloat(str) || 0; 
     }
 
-    /* ——— MESSAGE & LOADING ——— */
+    /* ——— UI NOTIFICATIONS ——— */
     function showLoader(msg = "Memuat data...") { 
         const indicator = document.getElementById("loadingIndicator");
-        indicator.textContent = msg;
+        document.getElementById("loadingText").textContent = msg;
         indicator.classList.remove("hidden"); 
     }
     function hideLoader() { document.getElementById("loadingIndicator").classList.add("hidden"); }
 
-    function showMessage(msg) {
-        const box = document.getElementById("messageBox");
-        box.textContent = msg;
-        box.classList.remove("hidden");
-        setTimeout(() => box.classList.add("hidden"), 3000);
+    // Toast Notification System
+    function showToast(msg, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        
+        // Styling agar persis seperti loading indicator (Compact Kapsul)
+        const baseClass = "bg-white dark:bg-gray-800 shadow-lg border px-4 py-2 rounded-full text-xs font-bold flex items-center space-x-2 toast-compact transition-all duration-300";
+        const typeClass = type === 'success' 
+            ? "border-emerald-100 dark:border-emerald-900/50 text-emerald-600" 
+            : "border-rose-100 dark:border-rose-900/50 text-rose-600";
+        
+        const icon = type === 'success' 
+            ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
+        
+        toast.className = `${baseClass} ${typeClass}`;
+        toast.innerHTML = `${icon} <span>${msg}</span>`;
+        
+        container.appendChild(toast);
+        
+        // Hilang otomatis setelah 3 detik
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
-    function showError(msg) {
-        const box = document.getElementById("errorBox");
-        box.textContent = msg;
-        box.classList.remove("hidden");
-        setTimeout(() => box.classList.add("hidden"), 5000);
+
+    // Fungsi Pengganti showMessage & showError
+    function showMessage(msg) { showToast(msg, 'success'); }
+    function showError(msg) { showToast(msg, 'error'); }
+
+    // Custom Confirmation Dialog
+    function customConfirm(msg) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('confirmMsg').textContent = msg;
+            modal.classList.remove('hidden');
+            
+            const handleOk = () => { modal.classList.add('hidden'); cleanup(); resolve(true); };
+            const handleCancel = () => { modal.classList.add('hidden'); cleanup(); resolve(false); };
+            const cleanup = () => {
+                document.getElementById('confirmOk').removeEventListener('click', handleOk);
+                document.getElementById('confirmCancel').removeEventListener('click', handleCancel);
+            };
+
+            document.getElementById('confirmOk').addEventListener('click', handleOk);
+            document.getElementById('confirmCancel').addEventListener('click', handleCancel);
+        });
     }
 
     /* ——— LAYER MANAGEMENT ——— */
     function showLayer(layerNumber) {
-        document.getElementById("layer1").classList.toggle('hidden', layerNumber !== 1);
-        document.getElementById("layer2").classList.toggle('hidden', layerNumber !== 2);
+        const l1 = document.getElementById("layer1"), l2 = document.getElementById("layer2");
+        if(layerNumber === 1) { l1.classList.remove('hidden'); l2.classList.add('hidden'); }
+        else { l1.classList.add('hidden'); l2.classList.remove('hidden'); }
     }
 
-    /* ——— MASTER DATA LOGIC ——— */
-
+    /* ——— LOGIC ——— */
     async function loadMasterData() {
         try {
             const res = await fetch(API_URL + "?action=getMaster", { cache: "no-store" }); 
-            const data = await res.json();
-            
-            if (data.error) throw new Error(data.error);
-            
-            masterProducts = data; 
-            // Fungsi populateDatalist() dihilangkan
-        } catch (err) {
-            showError("Gagal memuat Master Data Produk: " + err.message);
-        }
+            masterProducts = await res.json();
+        } catch (err) { showError("Master data gagal"); }
     }
 
-    // Fungsi populateDatalist() DIHAPUS
-
-    /* ——— MODAL LOGIC (EDIT ITEM) ——— */
-    function openModal(item) {
-        // Harga yang diterima dari API sudah bersih karena logic pembulatan di GAS
-        const safeHarga = parseFloat(item.harga); 
-
-        document.getElementById('editRowIndex').value = item.rowIndex;
-        document.getElementById('editHarga').value = safeHarga; // Harga RAW
-        document.getElementById('editNamaProduk').value = item.nama;
-        document.getElementById('editJumlah').value = item.jumlah;
-        document.getElementById('editTotal').value = formatRibuan(item.total); 
-        
-        document.getElementById('editModal').classList.remove('hidden');
-    }
-
-    function closeModal() {
-        document.getElementById('editModal').classList.add('hidden');
-    }
-
-    document.getElementById('editJumlah').addEventListener('input', () => {
-        const harga = parseFloat(document.getElementById('editHarga').value); 
-        const jumlah = parseFloat(document.getElementById('editJumlah').value); 
-        
-        if (jumlah < 1) {
-            document.getElementById('editTotal').value = formatRibuan(0);
-            return;
-        }
-
-        const total = jumlah * harga;
-        document.getElementById('editTotal').value = formatRibuan(total);
-    });
-
-    /* ——— MODAL LOGIC (ADD NEW ITEM) ——— */
-    const addItemNamaProduk = document.getElementById('addItemNamaProduk');
-    const addItemAutocompleteList = document.getElementById('addItemAutocompleteList');
-
-    function openAddItemModal() {
-        document.getElementById('addItemUniqueID').value = currentUniqueID;
-        // Reset input fields
-        addItemNamaProduk.value = ''; 
-        document.getElementById('addItemHargaRaw').value = 0;
-        document.getElementById('addItemKode').value = '';
-        document.getElementById('addItemStok').value = 0;
-        document.getElementById('addItemHargaDisplay').value = formatRibuan(0);
-        document.getElementById('addItemJumlah').value = 1;
-        document.getElementById('addItemTotal').value = formatRibuan(0);
-        
-        // Pastikan list saran tersembunyi saat modal dibuka
-        addItemAutocompleteList.classList.add('hidden'); 
-        
-        document.getElementById('addItemModal').classList.remove('hidden');
-        updateAddItemTotal(); 
-    }
-
-    function closeAddItemModal() {
-        document.getElementById('addItemModal').classList.add('hidden');
-    }
-
-    // Event Listeners untuk Autocomplete dan Kalkulasi
-    addItemNamaProduk.addEventListener('input', showAddItemSuggestions);
-    addItemNamaProduk.addEventListener('change', updateAddItemTotal); // Dijalankan setelah pemilihan atau keluar focus
-    document.getElementById('addItemJumlah').addEventListener('input', updateAddItemTotal);
-
-    /* ——— CUSTOM AUTOCOMPLETE LOGIC UNTUK ADD ITEM MODAL ——— */
-
-    function showAddItemSuggestions() {
-        const query = addItemNamaProduk.value.toLowerCase().trim();
-        addItemAutocompleteList.innerHTML = '';
-        updateAddItemTotal(); // Panggil kalkulasi saat mengetik
-
-        if (query.length < 1) {
-            addItemAutocompleteList.classList.add('hidden');
-            return;
-        }
-
-        const filteredProducts = masterProducts.filter(p => p.nama.toLowerCase().includes(query));
-
-        if (filteredProducts.length === 0) {
-            addItemAutocompleteList.classList.add('hidden');
-            return;
-        }
-        
-        filteredProducts.forEach(product => {
-            const div = document.createElement('div');
-            div.className = 'p-2 cursor-pointer hover:bg-indigo-100 text-sm';
-            div.textContent = product.nama;
-            
-            div.addEventListener('click', function() {
-                addItemNamaProduk.value = product.nama;
-                addItemAutocompleteList.classList.add('hidden');
-                updateAddItemTotal(); // Panggil fungsi untuk mengisi harga dan stok
-            });
-            addItemAutocompleteList.appendChild(div);
-        });
-
-        addItemAutocompleteList.classList.remove('hidden');
-    }
-
-    // Sembunyikan daftar saran saat mengklik di luar input atau daftar saran itu sendiri
-    document.addEventListener('click', function(e) {
-        if (document.getElementById('addItemModal').classList.contains('hidden')) return; // Hanya berlaku jika modal terbuka
-        
-        const isClickedOutside = !addItemNamaProduk.contains(e.target) && !addItemAutocompleteList.contains(e.target);
-        
-        if (isClickedOutside) {
-            addItemAutocompleteList.classList.add('hidden');
-        }
-    });
-    // ——— AKHIR CUSTOM AUTOCOMPLETE ———
-    
-    function updateAddItemTotal() {
-        const inputNama = addItemNamaProduk.value.trim();
-        const inputJumlah = parseFloat(document.getElementById('addItemJumlah').value) || 0;
-        
-        // Cari produk di array masterProducts (case-insensitive)
-        const selectedProduct = masterProducts.find(p => p.nama.toLowerCase() === inputNama.toLowerCase());
-
-        let harga = 0;
-        let kode = "";
-        let stok = 0;
-        
-        if (selectedProduct) {
-            harga = parseFloat(selectedProduct.harga) || 0; 
-            kode = selectedProduct.kode || ""; 
-            stok = parseFloat(selectedProduct.stok) || 0; 
-        }
-        
-        // Simpan data RAW ke input hidden
-        document.getElementById('addItemHargaRaw').value = harga;
-        document.getElementById('addItemKode').value = kode; 
-        document.getElementById('addItemStok').value = stok; 
-        
-        // Tampilkan harga yang diformat
-        document.getElementById('addItemHargaDisplay').value = formatRibuan(harga); 
-
-        // Hitung total
-        const total = inputJumlah * harga;
-        document.getElementById('addItemTotal').value = formatRibuan(total);
-    }
-
-
-    /* ——— API CALLS ——— */
-    
     async function loadRekapHeaders() {
         const body = document.getElementById("headerBody");
-        body.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500"><span class="loader"></span> Memuat data transaksi...</td></tr>';
-        showLoader("Memuat daftar transaksi...");
-
+        showLoader("Mengambil riwayat...");
         try {
             const res = await fetch(API_URL + "?action=getRekapHeaders", { cache: "no-store" });
             const data = await res.json();
             body.innerHTML = ''; 
-
-            if (!data || data.error) throw new Error(data.error || "Gagal memuat header rekap.");
+            if (!data || data.error) throw new Error();
 
             data.forEach(header => {
                 const tr = document.createElement('tr');
-                tr.className = "border-b hover:bg-gray-50";
+                tr.className = "hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-default";
+                let statusClass = "bg-gray-100 text-gray-600";
+                if(header.status === 'Done') statusClass = "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400";
+                if(header.status === 'Pengajuan') statusClass = "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400";
+                if (header.status === 'Kendala') statusClass = "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400";
+                if (header.status === 'Pending') statusClass = "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400";
+                
                 tr.innerHTML = `
-                    <td data-label="ID Unik" class="p-2 font-mono text-xs">${header.uniqueID}</td>
-                    <td data-label="PIC/Tanggal" class="p-2 text-xs">${header.namaUser}<br><span class="text-gray-500">${header.tanggal}</span></td>
-                    <td data-label="Kegiatan / Brand" class="p-2 text-xs">${header.kegiatan}<br><span class="text-indigo-600 font-semibold">${header.inputBrand}</span></td>
-                    <td data-label="Grand Total" class="p-2 text-right font-bold text-green-700">${formatRibuan(header.grandTotal)}</td>
-                    <td data-label="Status" class="p-2">
-                        <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                            header.status === 'Done' 
-                            ? 'bg-green-100 text-green-800' // Hijau untuk Done
-                            : header.status === 'Pengajuan' 
-                            ? 'bg-blue-100 text-blue-800' // Biru untuk Pengajuan
-                            : header.status === 'Kendala' 
-                            ? 'bg-red-100 text-red-800' // Merah untuk Kendala
-                            : 'bg-yellow-100 text-yellow-800' // Kuning untuk Pending/Default
-                        }">
-                        ${header.status}
-                        </span>
-                    </td>
-                    <td data-label="Aksi" class="p-2 text-center">
-                        <button onclick="loadRekapDetails('${header.uniqueID}')" class="px-3 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600">Detail</button>
-                    </td>
+                    <td data-label="ID Unik" class="p-4 font-mono font-bold text-primary">${header.uniqueID}</td>
+                    <td data-label="PIC" class="p-4"><b>${header.namaUser}</b><br><small>${header.tanggal}</small></td>
+                    <td data-label="Kegiatan" class="p-4"><b>${header.kegiatan}</b><br><small>${header.inputBrand}</small></td>
+                    <td data-label="Grand Total" class="p-4 text-right font-black">${formatRibuan(header.grandTotal)}</td>
+                    <td data-label="Status" class="p-4"><span class="px-3 py-1 text-[10px] font-black uppercase rounded-full ${statusClass}">${header.status}</span></td>
+                    <td data-label="Aksi" class="p-4 text-center"><button onclick="loadRekapDetails('${header.uniqueID}')" class="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:scale-105 transition-transform shadow-md">DETAIL</button></td>
                 `;
                 body.appendChild(tr);
             });
-
-        } catch (err) {
-            showError("Gagal memuat rekap: " + err.message);
-            body.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500">Error: ${err.message}</td></tr>`;
-        } finally {
-            hideLoader();
-        }
+        } catch (err) { showError("Gagal memuat daftar"); } finally { hideLoader(); }
     }
 
     async function loadRekapDetails(uniqueID) {
         currentUniqueID = uniqueID;
-        document.getElementById("detailUniqueID").textContent = uniqueID;
+        document.getElementById("detailUniqueID").textContent = "#" + uniqueID;
         const body = document.getElementById("detailBody");
-        
-        if (document.getElementById("detailFooter")) {
-            document.getElementById("detailFooter").remove();
-        }
-
-        body.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500"><span class="loader"></span> Memuat detail item...</td></tr>';
-        showLoader("Memuat detail...");
+        if (document.getElementById("detailFooter")) document.getElementById("detailFooter").remove();
+        body.innerHTML = '<tr><td colspan="5" class="p-12 text-center text-slate-400"><span class="loader"></span> Merinci item...</td></tr>';
         showLayer(2);
 
         try {
             const res = await fetch(API_URL + "?action=getRekapDetails&uniqueID=" + uniqueID, { cache: "no-store" });
             const responseData = await res.json();
             body.innerHTML = ''; 
-
-            if (!responseData || responseData.error) throw new Error(responseData.error || "Gagal memuat detail rekap.");
-
             const details = responseData.details;
-            const grandTotal = responseData.grandTotal;
 
             if (details.length === 0) {
-                 body.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Tidak ada item ditemukan.</td></tr>';
-                 const table = document.getElementById("detailTable");
-                 table.insertAdjacentHTML('beforeend', `<tfoot id="detailFooter">
-                     <tr class="bg-gray-200 font-bold">
-                         <td colspan="3" class="p-2 text-right">GRAND TOTAL</td>
-                         <td data-label="Total" class="p-2 text-right text-green-700">${formatRibuan(0)}</td>
-                         <td data-label="Aksi" class="p-2"></td>
-                     </tr>
-                    </tfoot>`);
-                 return;
+                body.innerHTML = '<tr><td colspan="5" class="p-12 text-center text-slate-400">Belum ada item ditambahkan.</td></tr>';
+            } else {
+                details.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 dark:hover:bg-gray-700/30 transition-colors";
+                    tr.innerHTML = `
+                        <td data-label="Produk" class="p-4"><b>${item.nama}</b><br><small>${item.kode} | Stok: ${item.stok}</small></td>
+                        <td data-label="Qty" class="p-4 text-center font-black">${item.jumlah}</td>
+                        <td data-label="Harga" class="p-4 text-slate-500">${formatRibuan(item.harga)}</td>
+                        <td data-label="Subtotal" class="p-4 text-right font-bold text-slate-900 dark:text-white">${formatRibuan(item.total)}</td>
+                        <td data-label="Aksi" class="p-4 flex space-x-2 justify-center">
+                            <button onclick='openModal(${JSON.stringify(item)})' class="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                            <button onclick="deleteItemHandler(${item.rowIndex}, '${item.nama}')" class="p-2 bg-rose-50 text-rose-600 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
             }
 
-            // 1. Tambahkan baris untuk setiap item
-            details.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.className = "border-b hover:bg-gray-50";
-                tr.innerHTML = `
-                    <td data-label="Nama Produk (Kode)" class="p-2">${item.nama}<br><span class="text-gray-500 text-xs">${item.kode} (Stok: ${item.stok})</span></td>
-                    <td data-label="Jumlah" class="p-2 font-semibold">${item.jumlah}</td>
-                    <td data-label="Harga" class="p-2">${formatRibuan(item.harga)}</td>
-                    <td data-label="Total" class="p-2 text-right font-semibold">${formatRibuan(item.total)}</td>
-                    <td data-label="Aksi" class="p-2 flex space-x-2 justify-center">
-                        <button onclick='openModal(${JSON.stringify(item)})' class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600">Edit</button>
-                        <button onclick="deleteItemHandler(${item.rowIndex}, '${item.nama}')" class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">Hapus</button>
-                    </td>
-                `;
-                body.appendChild(tr);
-            });
-            
-
-            // 2. Tambahkan Grand Total di footer tabel
             const table = document.getElementById("detailTable");
             const footer = document.createElement('tfoot');
             footer.id = "detailFooter";
-            footer.innerHTML = `
-                <tr class="bg-gray-200 font-bold">
-                    <td colspan="3" class="p-2 text-right">GRAND TOTAL</td>
-                    <td data-label="Total" class="p-2 text-right text-green-700">${formatRibuan(grandTotal)}</td>
-                    <td data-label="Aksi" class="p-2"></td>
-                </tr>
-            `;
+            footer.innerHTML = `<tr class="bg-slate-100 dark:bg-gray-700/80 font-black"><td colspan="3" class="p-4 text-right">GRAND TOTAL</td><td class="p-4 text-right text-lg text-primary">${formatRibuan(responseData.grandTotal)}</td><td></td></tr>`;
             table.appendChild(footer);
-
-
-        } catch (err) {
-            showError("Gagal memuat detail: " + err.message);
-            body.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">Error: ${err.message}</td></tr>`;
-        } finally {
-            hideLoader();
-        }
+        } catch (err) { showError("Detail gagal dimuat"); }
     }
 
-    // UPDATE ITEM (Action)
+    /* ——— MODAL HANDLERS ——— */
+    function openModal(item) {
+        document.getElementById('editRowIndex').value = item.rowIndex;
+        document.getElementById('editHarga').value = item.harga;
+        document.getElementById('editNamaProduk').value = item.nama;
+        document.getElementById('editJumlah').value = item.jumlah;
+        document.getElementById('editTotal').value = formatRibuan(item.total); 
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+    function closeModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+    document.getElementById('editJumlah').addEventListener('input', () => {
+        const harga = parseFloat(document.getElementById('editHarga').value) || 0;
+        const jumlah = parseFloat(document.getElementById('editJumlah').value) || 0;
+        document.getElementById('editTotal').value = formatRibuan(jumlah * harga);
+    });
+
+    const addItemNamaProduk = document.getElementById('addItemNamaProduk');
+    const addItemAutocompleteList = document.getElementById('addItemAutocompleteList');
+
+    function openAddItemModal() {
+        document.getElementById('addItemUniqueID').value = currentUniqueID;
+        addItemNamaProduk.value = ''; 
+        document.getElementById('addItemHargaRaw').value = 0;
+        document.getElementById('addItemHargaDisplay').value = formatRibuan(0);
+        document.getElementById('addItemJumlah').value = 1;
+        document.getElementById('addItemTotal').value = formatRibuan(0);
+        addItemAutocompleteList.classList.add('hidden'); 
+        document.getElementById('addItemModal').classList.remove('hidden');
+    }
+    function closeAddItemModal() { document.getElementById('addItemModal').classList.add('hidden'); }
+
+    addItemNamaProduk.addEventListener('input', () => {
+        const query = addItemNamaProduk.value.toLowerCase().trim();
+        addItemAutocompleteList.innerHTML = '';
+        if (query.length < 1) { addItemAutocompleteList.classList.add('hidden'); return; }
+        const filtered = masterProducts.filter(p => p.nama.toLowerCase().includes(query));
+        if (filtered.length === 0) { addItemAutocompleteList.classList.add('hidden'); return; }
+        filtered.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-gray-700 text-sm font-medium';
+            div.textContent = p.nama;
+            div.onclick = () => {
+                addItemNamaProduk.value = p.nama;
+                document.getElementById('addItemHargaRaw').value = p.harga;
+                document.getElementById('addItemKode').value = p.kode;
+                document.getElementById('addItemStok').value = p.stok;
+                document.getElementById('addItemHargaDisplay').value = formatRibuan(p.harga);
+                addItemAutocompleteList.classList.add('hidden');
+                updateAddItemTotal();
+            };
+            addItemAutocompleteList.appendChild(div);
+        });
+        addItemAutocompleteList.classList.remove('hidden');
+    });
+
+    function updateAddItemTotal() {
+        const harga = parseFloat(document.getElementById('addItemHargaRaw').value) || 0;
+        const jumlah = parseFloat(document.getElementById('addItemJumlah').value) || 0;
+        document.getElementById('addItemTotal').value = formatRibuan(harga * jumlah);
+    }
+    document.getElementById('addItemJumlah').addEventListener('input', updateAddItemTotal);
+
+    /* ——— ACTIONS ——— */
     document.getElementById('saveEditBtn').onclick = async () => {
         const btn = document.getElementById('saveEditBtn');
-        const oldLabel = btn.innerHTML;
-        btn.innerHTML = `<span class="loader"></span> Menyimpan...`;
-        btn.disabled = true;
-
-        const rowIndex = document.getElementById('editRowIndex').value;
-        const newNama = document.getElementById('editNamaProduk').value;
-        const newJumlah = parseFloat(document.getElementById('editJumlah').value); 
-        // Mengambil Total dengan parseNumber karena berasal dari input yang sudah diformat
-        const newTotal = parseNumber(document.getElementById('editTotal').value); 
-
-        if (!newNama || newJumlah < 1) {
-            showError("Nama Produk dan Jumlah wajib diisi.");
-            btn.innerHTML = oldLabel;
-            btn.disabled = false;
-            return;
-        }
-
+        btn.disabled = true; btn.innerHTML = `<span class="loader"></span>`;
         try {
             const res = await fetch(API_URL + "?action=updateItem", {
-                method: "POST",
-                // PERBAIKAN: Gunakan application/json agar Apps Script dapat memproses data
-                headers: { 'Content-Type': 'text/plain' }, 
+                method: "POST", headers: { 'Content-Type': 'text/plain' }, 
                 body: JSON.stringify({
-                    rowIndex: rowIndex,
-                    newNama: newNama,
-                    newJumlah: newJumlah,
-                    newTotal: newTotal 
+                    rowIndex: document.getElementById('editRowIndex').value,
+                    newNama: document.getElementById('editNamaProduk').value,
+                    newJumlah: parseFloat(document.getElementById('editJumlah').value),
+                    newTotal: parseNumber(document.getElementById('editTotal').value) 
                 })
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
-
-            showMessage("✅ Item berhasil diperbarui!");
+            showMessage("Berhasil diperbarui");
             closeModal();
             loadRekapDetails(currentUniqueID); 
-
-        } catch (err) {
-            showError("❌ Gagal menyimpan: " + err.message);
-        } finally {
-            btn.innerHTML = oldLabel;
-            btn.disabled = false;
-        }
+        } catch (err) { showError("Gagal menyimpan"); } finally { btn.disabled = false; btn.innerHTML = "Simpan"; }
     };
-    
-    // ADD NEW ITEM (Action)
+
     document.getElementById('saveNewItemBtn').onclick = async () => {
         const btn = document.getElementById('saveNewItemBtn');
-        const oldLabel = btn.innerHTML;
-        btn.innerHTML = `<span class="loader"></span> Menyimpan...`;
-        btn.disabled = true;
-
-        const uniqueID = document.getElementById('addItemUniqueID').value;
-        const nama = document.getElementById('addItemNamaProduk').value;
-        const jumlah = parseFloat(document.getElementById('addItemJumlah').value);
-        
-        // Ambil data baru dari hidden field
-        const kode = document.getElementById('addItemKode').value;    // BARU
-        const stok = parseFloat(document.getElementById('addItemStok').value);     // BARU
-        const harga = parseFloat(document.getElementById('addItemHargaRaw').value);
-        const total = parseNumber(document.getElementById('addItemTotal').value); // Total diambil dari input display lalu di-parse
-
-        if (!nama || jumlah < 1 || harga <= 0) {
-            showError("Nama Produk, Jumlah (min 1), dan Harga wajib diisi. Pastikan nama produk benar dan ada harganya.");
-            btn.innerHTML = oldLabel;
-            btn.disabled = false;
-            return;
-        }
-    
-    if (!uniqueID) {
-        showError("ID Transaksi tidak ditemukan. Muat ulang detail terlebih dahulu.");
-        btn.innerHTML = oldLabel;
-        btn.disabled = false;
-        return;
-    }
-
+        btn.disabled = true; btn.innerHTML = `<span class="loader"></span>`;
         try {
             const res = await fetch(API_URL + "?action=addItemToRekap", {
-                method: "POST",
-                headers: { 'Content-Type': 'text/plain' }, 
+                method: "POST", headers: { 'Content-Type': 'text/plain' }, 
                 body: JSON.stringify({
-                    uniqueID: uniqueID,
-                    nama: nama,
-                    jumlah: jumlah,
-                    kode: kode,      // KIRIM KODE
-                    stok: stok,      // KIRIM STOK
-                    harga: harga,
-                    total: total
+                    uniqueID: document.getElementById('addItemUniqueID').value,
+                    nama: addItemNamaProduk.value,
+                    jumlah: parseFloat(document.getElementById('addItemJumlah').value),
+                    kode: document.getElementById('addItemKode').value,
+                    stok: parseFloat(document.getElementById('addItemStok').value),
+                    harga: parseFloat(document.getElementById('addItemHargaRaw').value),
+                    total: parseNumber(document.getElementById('addItemTotal').value)
                 })
             });
             const data = await res.json();
-            if (data.error) throw new Error(data.error);
-
-            showMessage("✅ Item baru berhasil ditambahkan!");
+            if (data.error) throw new Error();
+            showMessage("Item ditambahkan");
             closeAddItemModal();
-            loadRekapDetails(uniqueID); 
-
-        } catch (err) {
-            showError("❌ Gagal menyimpan item baru: " + err.message);
-        } finally {
-            btn.innerHTML = oldLabel;
-            btn.disabled = false;
-        }
+            loadRekapDetails(currentUniqueID); 
+        } catch (err) { showError("Gagal menambahkan"); } finally { btn.disabled = false; btn.innerHTML = "Simpan ke Rekap"; }
     };
 
-    // DELETE ITEM (Action)
-    async function deleteItemHandler(rowIndex, namaProduk) {
-        if (!confirm(`Yakin ingin menghapus item "${namaProduk}" (Baris ${rowIndex})?`)) return;
+    async function deleteItemHandler(rowIndex, nama) {
+        const confirm = await customConfirm(`Anda akan menghapus "${nama}"?`);
+        if (!confirm) return;
 
-        showLoader(`Menghapus item ${namaProduk}...`);
-
+        showLoader("Menghapus...");
         try {
             const res = await fetch(API_URL + "?action=deleteItem", {
-                method: "POST",
-                // PERBAIKAN: Gunakan application/json agar Apps Script dapat memproses data
-                headers: { 'Content-Type': 'text/plain' }, 
+                method: "POST", headers: { 'Content-Type': 'text/plain' }, 
                 body: JSON.stringify({ rowIndex: rowIndex })
             });
             const data = await res.json();
-            if (data.error) throw new Error(data.error);
-
-            showMessage("🗑️ Item berhasil dihapus!");
+            if (data.error) throw new Error();
+            showMessage("Berhasil dihapus");
             loadRekapDetails(currentUniqueID); 
-            
-        } catch (err) {
-            showError("❌ Gagal menghapus: " + err.message);
-        } finally {
-            hideLoader();
-        }
+        } catch (err) { showError("Gagal menghapus"); } finally { hideLoader(); }
     }
 
+    document.addEventListener('click', (e) => {
+        if (!addItemNamaProduk.contains(e.target)) addItemAutocompleteList.classList.add('hidden');
+    });
 
-    /* —— INIT —— */
-    (function init() {
-        loadMasterData(); // Muat data master produk
-        loadRekapHeaders();
-    })();
+    (function init() { loadMasterData(); loadRekapHeaders(); })();
 </script>
 </body>
 </html>
